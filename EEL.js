@@ -7,7 +7,7 @@
 **/
 
 const EEL = (() => {
-  const version = "0.7.3";
+  const version = "0.0.1";
 
   const combine = (...strings) => {
     if (!strings) {

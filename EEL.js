@@ -1,38 +1,45 @@
 const EEL = (() => {
   "use strict";
-
+  
   /**
    * Easily Extendable Language
    * Copyright (c) 2024 Maxxus
    * MIT License (https://opensource.org/license/mit)
    *
+   *
+   *
    * This language is a bit different than what you're used to.
-   * Scope doesn't exist. Anything (excluding spaces) can be a variable.
-   * Variables cannot be destroyed, but they can always be overwritten.
-   * Null and Undefined values don’t exist. The only type is "string".
-   * I'm not joking. The only type is strings. When modifying this
+   * Scope doesn't exist. Anything (excluding spaces) can be a
+   * variable. Variables cannot be destroyed, but they can always
+   * be overwritten. Null and Undefined values don’t exist. The
+   * only type is "string". I'm not joking. When modifying this
    * source code, remember to use toNumber. the "number", "string",
-   * and "looselyequals" commands exist because there's probably some
-   * annoying "feature" that needs a bandaid. When accessing variables or
-   * using a function inside a function, prefix the name with a dash (-).
+   * and "looselyequals" commands exist because there's probably
+   * some annoying "feature" that needs a hacky bandaid. When
+   * accessing variables or using a function inside a function,
+   * prefix the name with a dash (-).
+   *
+   *
+   * EEL.parse() takes a string or array of your code, it returns the 
+   * output of the program in an array. Each item in the array starts
+   * with a one digit number (0-3), followed by a comma, and then the
+   * actual output. Their meanings are as follows:
+   *
+   * 0, = print
+   * 1, = warning
+   * 2, = error (stops program)
+   * 3, = execution halted (stops program) (for when you run stop())
+   *
+   * You can ignore these if you want by just using substring(2) on
+   * every item in the log, or you can detect the log type and style 
+   * your output!
   **/
-
+  
   const version = "1.1.0";
-  const debugging = false;
-  const debug = !debugging ? (() => true) : ((...txt) => console.log(...txt));
-  const combine = (...strings) => {
-    if (!strings) {
-      return "";
-    };
-    if (strings.length === 1) {
-      return strings[0];
-    };
-    let output = "";
-    strings.forEach(str => {
-      output = output.concat(str.toString());
-    });
-    return output;
-  };
+  const debugging = true;
+  
+  const debug = !debugging ? (() => true) : ((...txt) => console.log(...txt))
+  const inf = Number.MAX_SAFE_INTEGER;
   const commands = {
     /**
      * log is what to output into the log (default: undefined (no log))
@@ -40,24 +47,45 @@ const EEL = (() => {
      * vars is new variables (default: {})
      * stop is if the program should stop (default: false)
     **/
-    print: {params: 2**52, func: p => ({ log: "0," + p.join(" ") })},
-    warn: {params: 2**52, func: p => ({ log: "1," + p.join(" ") })},
-    error: {params: 2**52, func: p => ({ log: "2," + p.join(" "), stop: true })},
-    stop: {params: 2**52, func: p => ({ log: "3," + p.join(" "), stop: true })},
     
-    set: {params: 2**52, func: p => ({ vars: [p.shift(), p.join(" ")], val: p.join(" ")})},
+    // Log
+    print: {params: inf, func: p => ({ log: "0," + p.join(" ") })},
+    warn: {params: inf, func: p => ({ log: "1," + p.join(" ") })},
+    error: {params: inf, func: p => ({ log: "2," + p.join(" "), stop: true })},
     
-    add: {params: 2, func: p => ({ val: Number(p[0]) + Number(p[1]) })},
-    sub: {params: 2, func: p => ({ val: Number(p[0]) - Number(p[1]) })},
-    mul: {params: 2, func: p => ({ val: Number(p[0]) * Number(p[1]) })},
-    div: {params: 2, func: p => ({ val: Number(p[0]) / Number(p[1]) })},
-    pow: {params: 2, func: p => ({ val: Number(p[0]) ^ Number(p[1]) })},
+    // Flow
+    stop: {params: inf, func: p => ({ log: "3," + p.join(" "), stop: true })},
+    // TODO: this is trash and freezes ur browser until it's done waiting
+    /**
+     * wait: {params: 1, func: p => {
+     *   const end = Date.now() + Math.floor(Number(p[0]) * 1000);
+     *   while (Date.now() < end) continue;
+     * }},
+    **/
+    
+    // Variables
+    set: {params: inf, func: p => ({ vars: [p.shift(), p.join(" ")], val: p.join(" ")})},
+    
+    // Math
+    "++": {operator: true, params: 2, func: p => ({ val: Number(p[0]) + Number(p[1]) })},
+    "--": {operator: true, params: 2, func: p => ({ val: Number(p[0]) - Number(p[1]) })},
+    "**": {operator: true, params: 2, func: p => ({ val: Number(p[0]) * Number(p[1]) })},
+    // TODO: "//" is already used for comments. Don’t complain; I won’t fix it.
+    "-/": {operator: true, params: 2, func: p => ({ val: Number(p[0]) / Number(p[1]) })},
+    "^^": {operator: true, params: 2, func: p => ({ val: Number(p[0]) ^ Number(p[1]) })},
+    
+    min: {params: 2, func: p => ({ val: Math.min(Number(p[0]), Number(p[1])) })},
+    max: {params: 2, func: p => ({ val: Math.max(Number(p[0]), Number(p[1])) })},
+    // (num, min, max) INCLUSIVE; eg. (10,1,7) returns 7, not 6.
+    clamp: {params: 3, func: p => ({val: Math.min(Math.max(Number(p[0]), Number(p[1])), Number(p[2]))})},
+    
     sqrt: {params: 1, func: p => ({ val: Math.sqrt(p[0]) })},
     cbrt: {params: 1, func: p => ({ val: Math.cbrt(p[0]) })},
     
     abs: {params: 1, func: p => ({ val: Math.abs(p[0]) })},
     ceil: {params: 1, func: p => ({ val: Math.ceil(p[0]) })},
     floor: {params: 1, func: p => ({ val: Math.floor(p[0]) })},
+    round: {params: 1, func: p => ({ val: Math.round(p[0]) })},
     
     cos: {params: 1, func: p => ({ val: Math.cos(p[0]) })},
     cosh: {params: 1, func: p => ({ val: Math.cosh(p[0]) })},
@@ -79,18 +107,38 @@ const EEL = (() => {
     log10: {params: 1, func: p => ({ val: Math.log10(p[0]) })},
     log2: {params: 1, func: p => ({ val: Math.log2(p[0]) })},
     
-    looselyequals: {params: 2, func: p => ({ val: p[0] == p[1] })},
-    equals: {params: 2, func: p => ({ val: p[0] === p[1] })},
-    greater: {params: 2, func: p => ({ val: p[0] > p[1] })},
-    less: {params: 2, func: p => ({ val: p[0] < p[1] })},
+    // RNG
+    random: {params: 0, func: () => ({ val: Math.random() })},
+    randomint: {params: 2, func: p => {
+      // INCLUSIVE; eg. (1,7) could return 1-7 INCLUDING 1 and 7
+      const min = Math.floor(Math.min(Number(p[0]), Number(p[1])));
+      const max = Math.floor(Math.max(Number(p[0]), Number(p[1])) + 1);
+      return {val: Math.floor(Math.random() * (max - min)) + min};
+    }},
     
+    // Comparison
+    "~=": {operator: true, params: 2, func: p => ({ val: p[0] == p[1] })},
+    "==": {operator: true, params: 2, func: p => ({ val: p[0] === p[1] })},
+    ">>": {operator: true, params: 2, func: p => ({ val: p[0] > p[1] })},
+    "<<": {operator: true, params: 2, func: p => ({ val: p[0] < p[1] })},
+    
+    // Logic Gates
     not: {params: 1, func: p => ({ val: !p[0] })},
-    and: {params: 2, func: p => ({ val: p[0] && p[1] })},
-    or: {params: 2, func: p => ({ val: p[0] || p[1] })},
+    "&&": {operator: true, params: 2, func: p => ({ val: p[0] && p[1] })},
+    "||": {operator: true, params: 2, func: p => ({ val: p[0] || p[1] })},
     
-    number: {params: 1, func: p => ({ val: Number(p[0]) })},
+    // Types 
+    number: {params: 1, func: p => {
+      let num = Number(p[0]);
+      return {val: Number.isNaN(num) ? 0 : num};
+    }},
     string: {params: 1, func: p => ({ val: p[0].toString() })},
+    unnan: {params: 2, func: p => {
+      const num = Number(p[0]);
+      return {val: Number.isNaN(num) ? Number(p[1]) : num};
+    }},
   };
+  
   const exec = (vars, cmd, params) => {
     const c = commands[cmd.toString()];
     if (!c) return commands["error"].func(["Command \"" + cmd + "\" Not Found."]);
@@ -121,9 +169,10 @@ const EEL = (() => {
       const incmd = commands[newparams[i]];
       const incmdparams = [];
       const tempparams = newparams;
-      for (let j = 1; j <= incmd.params && i + j < newparams.length; j++) {
-        incmdparams.push(newparams[i + j]);
-        tempparams[i + j] = null;
+      for (let j = 1; j <= incmd.params + (incmd.operator ? 1:0) && i + j - (incmd.operator ? 1 : 0 < newparams.length; j++) {
+        if (i + j - incmdshift === i) continue;
+        incmdparams.push(newparams[i + j - incmdshift]);
+        tempparams[i + j - incmdshift] = null;
       };
       debug("preincmdexec", incmdparams);
       const out = exec(vars, newparams[i], incmdparams);
@@ -155,6 +204,7 @@ const EEL = (() => {
     debug("cmdout", cmdout);
     return cmdout;
   };
+  
   const clean = (arr) => {
     if (!arr || !Array.isArray(arr)) return [];
     const result = [];
@@ -170,6 +220,7 @@ const EEL = (() => {
     });
     return result;
   };
+  
   const parseArray = (arr) => {
     /* Trim, remove blank lines, remove comments, and parse.      *
      * When accepting values, first check if it’s a variable, if  *
@@ -179,7 +230,7 @@ const EEL = (() => {
      * “log” and the end of program.                              */
     if (!Array.isArray(arr)) throw new Error("expected an array");
     const log = [];
-    let vars = {"VERSION": version, "LANG": "javascript"};
+    let vars = {"VERSION": version, "LANG": "javascript", "MAX": Number.MAX_SAFE_INTEGER};
     const lines = clean(arr);
     for (const line of lines) {
       const params = line.split(" ");
@@ -199,6 +250,7 @@ const EEL = (() => {
     };
     return log.length > 0 ? log : ["0,no output"];
   };
+  
   const parse = (code) => {
     if (typeof (code) === "string") {
       return parseArray(code.split("\n"));
@@ -206,42 +258,43 @@ const EEL = (() => {
       return parseArray(code);
     } else throw new Error("expected string or array");
   };
-  return { parse, parseArray };
+  
+  const test = () => {
+    let passed = true;
+    const parsed = parse([
+      "// single-line comment",
+      "/* also single-line comment :(",
+      "-- more single-line comment",
+      "set str hello, world!",
+      "print when I say str it is text",
+      "print when I prefix it with a dash, it is -str",
+      "print -set testing cool test!",
+      "print version: -VERSION, lang: -LANG",
+      "print -add 1 2 is 3!!!",
+      "print wow look double  spaces!",
+      "print -print you should see this message, and then \"true\" (default output of functions)",
+      "print -clamp 10 1 7",
+      "print 1 -less 2",
+      "stop lol",
+      "print 2",
+    ]);
+    const correct = ["0,when I say str it is text", "0,when I prefix it with a dash, it is hello, world!", "0,cool test!", "0,version: " + version + ", lang: javascript", "0,3 is 3!!!", "0,wow look double  spaces!", "0,you should see this message, and then \"true\" (default output of functions)", "0,true", "0,7", "0,true", "3,lol"];
+    
+    for (let i = 0; i < correct.length; i++) {
+      if (parsed[i] !== correct[i]) {
+        passed = false;
+        debug("test failed on line " + i + ",", test[i], "is not equal to", correct[i]);
+      };
+    };
+    
+    debug("testcorrect", correct);
+    debug("testparsed", parsed);
+    debug("testpassed", passed);
+    
+    return passed;
+  };
+  
+  return { parse, test };
 })();
 
-/* test */
-
-/**
- * expected output (v1.1.0)
- *
- * - when I say str it is text
- * - when I prefix it with a dash, it is hello, world!
- * - cool test!
- * - version: 1.1.0, lang: javascript
- * - 3 is 3!!!
- * - wow look double  spaces!
- * - you should see this message, and then "true" (default output of function)
- * - true
- * - EXECUTION HALTED: lol
-**/
-EEL.parse(`
-// single-line comment
-/* also single-line comment :(
--- more single-line comment
-set str hello, world!
-print when I say str it is text
-print when I prefix it with a dash, it is -str
-print -set testing cool test!
-print version: -VERSION, lang: -LANG
-print -add 1 2 is 3!!!
-print wow look double  spaces!
-print -print you should see this message, and then "true" (default output of functions)
-stop lol
-/* doesnt run
-print 2
-`).forEach(log => {
-  if (log.startsWith("0,")) console.log(log.replace("0,", ""));
-  if (log.startsWith("1,")) console.log("WARNING: ".concat(log.replace("1,", "")));
-  if (log.startsWith("2,")) console.log("ERROR: ".concat(log.replace("2,", "")));
-  if (log.startsWith("3,")) console.log("EXECUTION HALTED: ".concat(log.replace("3,", "")));
-});
+console.log("working: " + EEL.test());

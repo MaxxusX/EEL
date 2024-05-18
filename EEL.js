@@ -35,7 +35,7 @@ const EEL = (() => {
    * your output!
   **/
   
-  const version = "1.1.0";
+  const version = "2.0.0";
   const debugging = true;
   
   const debug = !debugging ? (() => true) : ((...txt) => console.log(...txt))
@@ -270,11 +270,11 @@ const EEL = (() => {
       "print when I prefix it with a dash, it is -str",
       "print -set testing cool test!",
       "print version: -VERSION, lang: -LANG",
-      "print -add 1 2 is 3!!!",
+      "print 1 ++ 2 is 3!!!",
       "print wow look double  spaces!",
       "print -print you should see this message, and then \"true\" (default output of functions)",
       "print -clamp 10 1 7",
-      "print 1 -less 2",
+      "print 1 << 2",
       "stop lol",
       "print 2",
     ]);

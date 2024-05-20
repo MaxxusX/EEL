@@ -187,37 +187,6 @@ const EEL = (() => {
     let incmdstop = false;
     let hasincmd = false;
 
-    // TODO: This is broken, pls fix.
-    // old code for reference:
-    /*
-    for (let i = 0; i < params.length; i++) {
-      debug("params", params);
-      if (params[i] === null || !params[i].startsWith("-")) continue;
-      let newparams = params;
-      newparams[i] = newparams[i].substring(1);
-      if (!Object.hasOwn(commands, newparams[i])) continue;
-      hasincmd = true;
-      const incmd = commands[newparams[i]];
-      const incmdparams = [];
-      const tempparams = newparams;
-      for (let j = 1; j <= incmd.params + (incmd.operator ? 1:0) && i + j - (incmd.operator ? 1 : 0 < newparams.length; j++) {
-        if (i + j - incmdshift === i) continue;
-        incmdparams.push(newparams[i + j - incmdshift]);
-        tempparams[i + j - incmdshift] = null;
-      };
-      debug("preincmdexec", incmdparams);
-      const out = exec(vars, newparams[i], incmdparams);
-      debug("incmdout", out);
-      out.log.forEach(v => cmdlog.push(v));
-      for (const [k, v] of Object.entries(out.vars)) {
-        variables[k] = v;
-      };
-      incmdstop = out.stop;
-      tempparams[i] = out.val;
-      
-      tempparams.forEach(el => {if (el !== null) parsedparams.push(el)});
-    };
-    */
     for (let i = 0; i < params.length; i++) {
       if (params[i] === null) {
         /**
@@ -245,7 +214,9 @@ const EEL = (() => {
       const incmdparams = [];
       const tempparams = clonearray(newparams);
       const incmdshift = incmd.operator ? 1:0;
-      for (let j = 0; j <= incmd.params; j++) {
+
+      // TODO: This is broken, pls fix.
+      for (let j = 0 /* 1 */; j <= incmd.params /* + incmdshift */; j++) {
         const paramindex = i + j - incmdshift;
         if (paramindex >= newparams.length) break;
         if (paramindex === i) continue;
@@ -253,6 +224,7 @@ const EEL = (() => {
         incmdparams.push(tempparams[paramindex]);
         tempparams[paramindex] = null;
       };
+
       const out = exec(vars, newparams[i], incmdparams);
       out.log.forEach(v => cmdlog.push(v));
       for (const [k, v] of Object.entries(out.vars)) {

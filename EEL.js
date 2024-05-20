@@ -233,11 +233,16 @@ const EEL = (() => {
       incmdstop = out.stop;
       tempparams[i] = out.val;
       debug("tempparams", tempparams);
-      parsedparams = [];
-      tempparams.forEach(el => {if (el !== null) parsedparams.push(el)});
+      parsedparams = clonearray(tempparams);
+      // tempparams.forEach(el => {if (el !== null) parsedparams.push(el)});
       debug("parsedparams", parsedparams);
     };
     if (!hasincmd) parsedparams = params;
+
+    const temporary = clonearray(parsedparams);
+    parsedparams = [];
+    temporary.forEach(el => {if (el !== null) parsedparams.push(el)});
+
     debug("postincmd", parsedparams);
     let cmdout = c.func(parsedparams);
     if (cmdout.log !== undefined) cmdlog.push(cmdout.log);

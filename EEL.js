@@ -35,11 +35,44 @@ const EEL = (() => {
    * your output!
   **/
   
-  const version = "2.0.0";
+  const version = "2.0.1";
   const debugging = true;
   
   const debug = !debugging ? (() => true) : ((...txt) => console.log(...txt))
   const inf = Number.MAX_SAFE_INTEGER;
+  const clean = (arr) => {
+    if (!arr || !Array.isArray(arr)) return [];
+    const result = [];
+    arr.forEach(el => {
+      if (el) {
+        const trimmed = el.toString().trim();
+        if (trimmed) result.push(trimmed);
+      };
+    });
+    return result;
+  };
+  const removecomments = (arr) => {
+    if (!arr || !Array.isArray(arr)) return [];
+    const result = [];
+    clean(arr).forEach(el => {
+      if (!el.startsWith("//")
+       && !el.startsWith("/*")
+       && !el.startsWith("--")
+      ) result.push(el);
+    });
+    return result;
+  };
+  /**
+   * Use this instead of =. Running "let a = b"
+   * sets "a" to a *reference* of "b", not a copy.
+   * That means all changes to "a" affect "b".
+  **/
+  const clonearray = (arr) => {
+    if (!arr || !Array.isArray(arr)) return [];
+    const result = [];
+    arr.forEach(el => result.push(el));
+    return result;
+  };
   const commands = {
     /**
      * log is what to output into the log (default: undefined (no log))
@@ -127,12 +160,7 @@ const EEL = (() => {
     "&&": {operator: true, params: 2, func: p => ({ val: p[0] && p[1] })},
     "||": {operator: true, params: 2, func: p => ({ val: p[0] || p[1] })},
     
-    // Types 
-    number: {params: 1, func: p => {
-      let num = Number(p[0]);
-      return {val: Number.isNaN(num) ? 0 : num};
-    }},
-    string: {params: 1, func: p => ({ val: p[0].toString() })},
+    // "Types"
     unnan: {params: 2, func: p => {
       const num = Number(p[0]);
       return {val: Number.isNaN(num) ? Number(p[1]) : num};
@@ -152,7 +180,6 @@ const EEL = (() => {
     };
     debug("presplit", paramsstr);
     params = paramsstr.split(" ");
-    debug("postsplit", params);
     debug("preincmd", params);
     const cmdlog = [];
     let variables = {};
@@ -160,31 +187,51 @@ const EEL = (() => {
     let incmdstop = false;
     let hasincmd = false;
     for (let i = 0; i < params.length; i++) {
-      debug("params", params);
-      if (params[i] === null || !params[i].startsWith("-")) continue;
-      let newparams = params;
-      newparams[i] = newparams[i].substring(1);
+      if (params[i] === null) {
+        /**
+         * when a command executes, it replaces itself with its output, and
+         * replaces its parameters with null, but it cannot remove its parameters
+         * so if we don’t manually remove them and restart the check, we’ll
+         * accidentally pass null to other commands, which messes things up
+         *
+         * ^ the above situation only happens in 2+ layer command recursion
+         * eg "print 1 ++ 2 ** 2" which means print(multiply(add(1, 2), 2))
+        **/
+        params = clean(params);
+        i = -1;
+        continue;
+      };
+      let newparams = clonearray(params);
+      if (!newparams[i].startsWith("-") && !(commands[newparams[i]] ?? {}).operator) {
+        continue;
+      } else if (newparams[i].startsWith("-") && newparams[i].length > 1) {
+        newparams[i] = newparams[i].substring(1);
+      };
       if (!Object.hasOwn(commands, newparams[i])) continue;
       hasincmd = true;
       const incmd = commands[newparams[i]];
       const incmdparams = [];
-      const tempparams = newparams;
-      for (let j = 1; j <= incmd.params + (incmd.operator ? 1:0) && i + j - (incmd.operator ? 1 : 0 < newparams.length; j++) {
-        if (i + j - incmdshift === i) continue;
-        incmdparams.push(newparams[i + j - incmdshift]);
-        tempparams[i + j - incmdshift] = null;
+      const tempparams = clonearray(newparams);
+      const incmdshift = incmd.operator ? 1:0;
+      for (let j = 0; j <= incmd.params; j++) {
+        const paramindex = i + j - incmdshift;
+        if (paramindex >= newparams.length) break;
+        if (paramindex === i) continue;
+        debug("paramindex", paramindex);
+        incmdparams.push(tempparams[paramindex]);
+        tempparams[paramindex] = null;
       };
-      debug("preincmdexec", incmdparams);
       const out = exec(vars, newparams[i], incmdparams);
-      debug("incmdout", out);
       out.log.forEach(v => cmdlog.push(v));
       for (const [k, v] of Object.entries(out.vars)) {
         variables[k] = v;
       };
       incmdstop = out.stop;
       tempparams[i] = out.val;
-      
+      debug("tempparams", tempparams);
+      parsedparams = [];
       tempparams.forEach(el => {if (el !== null) parsedparams.push(el)});
+      debug("parsedparams", parsedparams);
     };
     if (!hasincmd) parsedparams = params;
     debug("postincmd", parsedparams);
@@ -192,33 +239,17 @@ const EEL = (() => {
     if (cmdout.log !== undefined) cmdlog.push(cmdout.log);
     // bandaid for incmds not being able to halt execution
     if (incmdstop) cmdout.stop = true;
-    cmdout.val ??= true;
+    cmdout.val ??= "true";
+    cmdout.val = cmdout.val.toString();
     cmdout.vars ??= [];
     cmdout.log = cmdlog;
     cmdout.stop ??= false;
-    debug("cmdoutvar", cmdout.var);
     if (cmdout.vars.length >= 2 && cmdout.vars[0] !== undefined && cmdout.vars[1] !== undefined) {
       variables[cmdout.vars[0]] = cmdout.vars[1];
     };
     cmdout.vars = variables;
     debug("cmdout", cmdout);
     return cmdout;
-  };
-  
-  const clean = (arr) => {
-    if (!arr || !Array.isArray(arr)) return [];
-    const result = [];
-    arr.forEach(el => {
-      if (el) {
-        let trimmed = el.toString().trim();
-        if (trimmed
-          && !trimmed.startsWith("//")
-          && !trimmed.startsWith("/*")
-          && !trimmed.startsWith("--")
-        ) result.push(trimmed);
-      };
-    });
-    return result;
   };
   
   const parseArray = (arr) => {
@@ -230,8 +261,8 @@ const EEL = (() => {
      * “log” and the end of program.                              */
     if (!Array.isArray(arr)) throw new Error("expected an array");
     const log = [];
-    let vars = {"VERSION": version, "LANG": "javascript", "MAX": Number.MAX_SAFE_INTEGER};
-    const lines = clean(arr);
+    let vars = {"VERSION": version, "LANG": "javascript", "MAX": inf};
+    const lines = removecomments(arr);
     for (const line of lines) {
       const params = line.split(" ");
       const cmd = params.shift();
@@ -275,10 +306,11 @@ const EEL = (() => {
       "print -print you should see this message, and then \"true\" (default output of functions)",
       "print -clamp 10 1 7",
       "print 1 << 2",
+      "print 1+2*2 prints 6, not 5, cuz we read left to right: 1 ++ 2 ** 2",
       "stop lol",
       "print 2",
     ]);
-    const correct = ["0,when I say str it is text", "0,when I prefix it with a dash, it is hello, world!", "0,cool test!", "0,version: " + version + ", lang: javascript", "0,3 is 3!!!", "0,wow look double  spaces!", "0,you should see this message, and then \"true\" (default output of functions)", "0,true", "0,7", "0,true", "3,lol"];
+    const correct = ["0,when I say str it is text", "0,when I prefix it with a dash, it is hello, world!", "0,cool test!", "0,version: " + version + ", lang: javascript", "0,3 is 3!!!", "0,wow look double  spaces!", "0,you should see this message, and then \"true\" (default output of functions)", "0,true", "0,7", "0,true", "0,1+2*2 prints 6, not 5, cuz we read left to right: 6", "3,lol"];
     
     for (let i = 0; i < correct.length; i++) {
       if (parsed[i] !== correct[i]) {
@@ -297,4 +329,12 @@ const EEL = (() => {
   return { parse, test };
 })();
 
-console.log("working: " + EEL.test());
+// console.log("working: " + EEL.test());
+
+// testing
+EEL.parse([
+  "print 1 ++ 2 is 3!!!",
+  "print guh 1 ++ 2 ** 2",
+  "print -min 1 2 one",
+  "print h -min 1 2",
+]).forEach(l => console.log(l));

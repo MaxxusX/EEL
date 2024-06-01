@@ -280,8 +280,11 @@ const EEL = (() => {
          * ^ the above situation only happens in 2+ layer command recursion
          * eg "print 1 ++ 2 ** 2" which means print(multiply(add(1, 2), 2))
         **/
+        
         debug("incmd: null detected; restarting", i);
+        
         parsedparams = copyparams(parsedparams);
+        
         i = -1;
         continue;
       };
@@ -336,8 +339,8 @@ const EEL = (() => {
       };
       
       const out = exec(vars, newparams[i], incmdparams);
-      out.log.forEach(v => cmdlog.push(v));
       
+      out.log.forEach(v => cmdlog.push(v));
       for (const [k, v] of Object.entries(out.vars)) {
         variables[k] = v;
       };
@@ -378,7 +381,7 @@ const EEL = (() => {
     if (!Array.isArray(arr)) throw new Error("expected an array");
     
     const log = [];
-    let vars = {"VERSION": version, "LANG": "javascript", "MAX": Number.MAX_SAFE_INTEGER};
+    let vars = {"VERSION": version, "LANG": "javascript"};
     const lines = clean(arr);
     
     try {
